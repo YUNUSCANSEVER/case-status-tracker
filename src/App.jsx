@@ -1364,82 +1364,85 @@ export default function App() {
         <header className="topbar">
           <div>
             <p className="eyebrow">USCIS Tracking Workspace</p>
-            <h2>{pageTitle}</h2>
+            <div className="topbar-title-row">
+              <h2>{pageTitle}</h2>
+              <div className="notification-wrapper" ref={notificationsMenuRef}>
+                <button
+                  type="button"
+                  className={`notification-button ${isNotificationsOpen ? "open" : ""}`}
+                  onClick={toggleNotificationsPanel}
+                  aria-label="Open notifications"
+                  aria-expanded={isNotificationsOpen}
+                >
+                  <span className="notification-button-icon">🔔</span>
+                  <span className="notification-button-text">Notifications</span>
+                  {unreadNotificationsCount > 0 && (
+                    <span className="notification-badge">
+                      {unreadNotificationsCount > 9 ? "9+" : unreadNotificationsCount}
+                    </span>
+                  )}
+                </button>
+
+                {isNotificationsOpen && (
+                  <div className="notification-popover">
+                    <div className="notification-popover-header">
+                      <div>
+                        <h3>Notifications</h3>
+                        <p>Case status changes from auto or manual checks.</p>
+                      </div>
+
+                      <button
+                        type="button"
+                        className="notification-link-button"
+                        onClick={markNotificationsAsRead}
+                      >
+                        Mark all read
+                      </button>
+                    </div>
+
+                    {notificationItems.length === 0 ? (
+                      <div className="notification-empty-state">
+                        No case status change notifications yet.
+                      </div>
+                    ) : (
+                      <div className="notification-list">
+                        {notificationItems.map((notification, index) => (
+                            <button
+                              key={`${notification.caseId}-${notification.date}-${notification.title}-${index}`}
+                              type="button"
+                              className="notification-item"
+                              onClick={() => handleNotificationClick(notification)}
+                            >
+                              <div className="notification-item-top">
+                                <strong>{notification.caseLabel}</strong>
+                                <span className="notification-item-date">
+                                  {getShortDateTime(notification.date)}
+                                </span>
+                              </div>
+
+                              <div className="notification-item-badges">
+                                <span className="notification-item-source">
+                                  {getEventSourceLabel(notification.source)}
+                                </span>
+                                <span className="notification-item-meta">{notification.formType}</span>
+                                <span className="notification-item-meta">
+                                  {displayReceipt(notification.receiptNumber, settings.maskReceiptNumbers)}
+                                </span>
+                              </div>
+
+                              <p>{getNotificationSummary(notification)}</p>
+                            </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+            </div>
           </div>
 
           <div className="topbar-actions">
-            <div className="notification-wrapper" ref={notificationsMenuRef}>
-              <button
-                type="button"
-                className={`notification-button ${isNotificationsOpen ? "open" : ""}`}
-                onClick={toggleNotificationsPanel}
-                aria-label="Open notifications"
-                aria-expanded={isNotificationsOpen}
-              >
-                <span className="notification-button-icon">🔔</span>
-                {unreadNotificationsCount > 0 && (
-                  <span className="notification-badge">
-                    {unreadNotificationsCount > 9 ? "9+" : unreadNotificationsCount}
-                  </span>
-                )}
-              </button>
-
-              {isNotificationsOpen && (
-                <div className="notification-popover">
-                  <div className="notification-popover-header">
-                    <div>
-                      <h3>Notifications</h3>
-                      <p>Case status changes from auto or manual checks.</p>
-                    </div>
-
-                    <button
-                      type="button"
-                      className="notification-link-button"
-                      onClick={markNotificationsAsRead}
-                    >
-                      Mark all read
-                    </button>
-                  </div>
-
-                  {notificationItems.length === 0 ? (
-                    <div className="notification-empty-state">
-                      No case status change notifications yet.
-                    </div>
-                  ) : (
-                    <div className="notification-list">
-                      {notificationItems.map((notification, index) => (
-                        <button
-                          key={`${notification.caseId}-${notification.date}-${notification.title}-${index}`}
-                          type="button"
-                          className="notification-item"
-                          onClick={() => handleNotificationClick(notification)}
-                        >
-                          <div className="notification-item-top">
-                            <strong>{notification.caseLabel}</strong>
-                            <span className="notification-item-date">
-                              {getShortDateTime(notification.date)}
-                            </span>
-                          </div>
-
-                          <div className="notification-item-badges">
-                            <span className="notification-item-source">
-                              {getEventSourceLabel(notification.source)}
-                            </span>
-                            <span className="notification-item-meta">{notification.formType}</span>
-                            <span className="notification-item-meta">
-                              {displayReceipt(notification.receiptNumber, settings.maskReceiptNumbers)}
-                            </span>
-                          </div>
-
-                          <p>{getNotificationSummary(notification)}</p>
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-
             <input
               value={search}
               onChange={(event) => setSearch(event.target.value)}

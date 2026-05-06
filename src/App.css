@@ -2110,3 +2110,69 @@ tbody tr:hover,
     align-items: flex-start;
   }
 }
+
+
+.topbar-title-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.topbar-title-row h2 {
+  margin: 6px 0 0;
+}
+
+.notification-button-text {
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.topbar-title-row .notification-button {
+  width: auto;
+  min-width: 148px;
+  height: 44px;
+  padding: 0 14px;
+  gap: 8px;
+  border-color: #bfdbfe;
+  background: #eff6ff;
+  color: #175cd3;
+}
+
+.topbar-title-row .notification-button:hover,
+.topbar-title-row .notification-button.open {
+  border-color: #4f8cff;
+  background: #dbeafe;
+}
+
+.topbar-title-row .notification-badge {
+  top: -7px;
+  right: -7px;
+}
+
+.theme-night .topbar-title-row .notification-button {
+  background: #122549;
+  border-color: #245bb9;
+  color: #bfdbfe;
+}
+
+.theme-night .topbar-title-row .notification-button:hover,
+.theme-night .topbar-title-row .notification-button.open {
+  background: #17315f;
+}
+
+
+@media (max-width: 640px) {
+  .topbar-title-row {
+    align-items: stretch;
+  }
+
+  .topbar-title-row .notification-wrapper {
+    width: 100%;
+    order: 0;
+  }
+
+  .topbar-title-row .notification-button {
+    width: 100%;
+  }
+}
