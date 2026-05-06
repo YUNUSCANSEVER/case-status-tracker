@@ -147,6 +147,7 @@ async function runAutoCheck(env) {
 function getAllowedOrigin(request, env) {
   const origin = request.headers.get("Origin");
 
+  // Local dev + the exact production origin saved as FRONTEND_ORIGIN.
   const allowedOrigins = [
     "http://localhost:5173",
     "http://127.0.0.1:5173",
@@ -154,6 +155,19 @@ function getAllowedOrigin(request, env) {
   ].filter(Boolean);
 
   if (origin && allowedOrigins.includes(origin)) return origin;
+
+  // Vercel can create preview URLs with changing subdomains.
+  // Allow only HTTPS *.vercel.app origins so preview/production deployments work without re-adding secrets.
+  if (origin) {
+    try {
+      const parsedOrigin = new URL(origin);
+      if (parsedOrigin.protocol === "https:" && parsedOrigin.hostname.endsWith(".vercel.app")) {
+        return origin;
+      }
+    } catch (error) {
+      console.warn("Could not parse request origin", origin);
+    }
+  }
 
   // Non-browser requests like direct browser GET /api/health often do not have Origin.
   return env.FRONTEND_ORIGIN || "http://localhost:5173";
@@ -491,11 +505,11 @@ async function checkCaseById(id, env, options = {}) {
 
 async function checkActiveCases(env, options = {}) {
   const caseRows = await supabaseRequest(env, "/cases?select=*", { method: "GET" });
-  const activeCases = caseRows.filter((row) => isActiveStatus(row.status));
+  const casesToCheck = caseRows;
   const results = [];
   const errors = [];
 
-  for (const caseRow of activeCases) {
+  for (const caseRow of casesToCheck) {
     try {
       const result = await checkAndUpdateCase(caseRow, env, {
         recordNoChange: Boolean(options.recordNoChange),
@@ -512,7 +526,7 @@ async function checkActiveCases(env, options = {}) {
   }
 
   return {
-    checked: activeCases.length,
+    checked: casesToCheck.length,
     updated: results.filter((result) => result.statusChanged).length,
     results,
     errors,

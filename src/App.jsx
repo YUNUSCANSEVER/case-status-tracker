@@ -777,14 +777,14 @@ export default function App() {
   }
 
   async function handleCheckAllActiveCases() {
-    const activeCases = cases.filter((caseItem) => isActiveCase(caseItem.status));
+    const casesToCheck = cases;
 
-    if (activeCases.length === 0) {
-      showToast("info", "No active cases", "There are no active cases to check.");
+    if (casesToCheck.length === 0) {
+      showToast("info", "No cases", "There are no cases to check.");
       return;
     }
 
-    const confirmed = window.confirm(`Check status for ${activeCases.length} active case(s)?`);
+    const confirmed = window.confirm(`Check status for ${casesToCheck.length} case(s)?`);
     if (!confirmed) return;
 
     setIsCheckingAll(true);
@@ -809,7 +809,7 @@ export default function App() {
       showToast(
         "success",
         "Check completed",
-        `Checked ${result.checked || activeCases.length} active case(s). Updated ${result.updated || 0}.`
+        `Checked ${result.checked || casesToCheck.length} case(s). Updated ${result.updated || 0}.`
       );
     } catch (error) {
       console.warn(error);
@@ -1568,7 +1568,7 @@ function QuickActionsStrip({ onCheckNow, onCheckAllActive, onExportCsv, isChecki
     <section className="quick-actions-strip">
       <div className="quick-actions-copy">
         <strong>Quick Actions</strong>
-        <span>Run USCIS checks or export current tracker data.</span>
+        <span>Run USCIS checks for selected or all tracked cases.</span>
       </div>
 
       <div className="quick-actions-strip-buttons">
@@ -1576,7 +1576,7 @@ function QuickActionsStrip({ onCheckNow, onCheckAllActive, onExportCsv, isChecki
           Check Selected Case
         </button>
         <button onClick={onCheckAllActive} className="secondary-button" disabled={isCheckingAll}>
-          {isCheckingAll ? "Checking..." : "Check All Active"}
+          {isCheckingAll ? "Checking..." : "Check All Cases"}
         </button>
         <button onClick={onExportCsv} className="secondary-button">
           Export CSV
@@ -1605,7 +1605,7 @@ function AutoCheckStatus({
           {backendError
             ? `Backend error: ${backendError}`
             : backendCronActive
-              ? `Backend cron checks active cases every ${AUTO_CHECK_INTERVAL_MINUTES} minutes, even if the browser is closed.`
+              ? `Backend cron checks all tracked cases every ${AUTO_CHECK_INTERVAL_MINUTES} minutes, even if the browser is closed.`
               : "Run backend and verify /api/health to confirm scheduled checks."}
         </span>
       </div>
@@ -1672,7 +1672,7 @@ function CasesPanel({
         </div>
         <div className="panel-header-actions">
           <button onClick={onCheckAllActive} className="secondary-button" disabled={isCheckingAll}>
-            {isCheckingAll ? "Checking..." : "Check All Active"}
+            {isCheckingAll ? "Checking..." : "Check All Cases"}
           </button>
           <button onClick={onExportCsv} className="secondary-button">
             Export CSV
@@ -1975,7 +1975,7 @@ function CasesView({
           </button>
 
           <button onClick={onCheckAllActive} className="secondary-button" disabled={isCheckingAll}>
-            {isCheckingAll ? "Checking..." : "Check All Active"}
+            {isCheckingAll ? "Checking..." : "Check All Cases"}
           </button>
 
           <button onClick={onBulkAdd} className="secondary-button">
