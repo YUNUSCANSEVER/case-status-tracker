@@ -592,22 +592,6 @@ export default function App() {
   const maxStatusCount = Math.max(...groupedByStatus.map((item) => item.value), 1);
   const maxAgingCount = Math.max(...agingBuckets.map((item) => item.value), 1);
 
-  const recentStatusEvents = useMemo(() => {
-    return cases
-      .flatMap((caseItem) =>
-        (caseItem.history || []).map((event) => ({
-          ...event,
-          caseId: caseItem.id,
-          caseLabel: caseItem.caseLabel,
-          receiptNumber: caseItem.receiptNumber,
-          formType: caseItem.formType,
-          currentStatus: caseItem.status,
-        }))
-      )
-      .sort((a, b) => new Date(b.date) - new Date(a.date))
-      .slice(0, 8);
-  }, [cases]);
-
   const notificationItems = useMemo(() => {
     return cases
       .flatMap((caseItem) =>
@@ -1513,7 +1497,6 @@ export default function App() {
             groupedByStatus={groupedByStatus}
             maxFormCount={maxFormCount}
             maxStatusCount={maxStatusCount}
-            recentStatusEvents={recentStatusEvents}
             caseStatusFilter={caseStatusFilter}
             setCaseStatusFilter={setCaseStatusFilter}
             onExportCsv={handleExportCsv}
@@ -1694,7 +1677,6 @@ function DashboardView({
   groupedByStatus,
   maxFormCount,
   maxStatusCount,
-  recentStatusEvents,
   caseStatusFilter,
   setCaseStatusFilter,
   onExportCsv,
@@ -1777,10 +1759,6 @@ function DashboardView({
         />
       </section>
 
-      <RecentUpdatesPanel
-        recentStatusEvents={recentStatusEvents}
-        setSelectedCaseId={setSelectedCaseId}
-      />
     </>
   );
 }
@@ -2072,51 +2050,6 @@ function CaseDetailPanel({
         ))}
       </div>
     </div>
-  );
-}
-
-function RecentUpdatesPanel({ recentStatusEvents, setSelectedCaseId }) {
-  return (
-    <section className="panel recent-updates-panel">
-      <div className="panel-header">
-        <div>
-          <h3>Recent Status Activity</h3>
-          <p>Latest USCIS checks, manual edits, and backend cron updates.</p>
-        </div>
-      </div>
-
-      {recentStatusEvents.length === 0 ? (
-        <p className="muted-text">No status activity yet.</p>
-      ) : (
-        <div className="recent-updates-list">
-          {recentStatusEvents.map((event, index) => (
-            <button
-              key={`${event.caseId}-${event.date}-${event.title}-${index}`}
-              type="button"
-              className="recent-update-item"
-              onClick={() => setSelectedCaseId(event.caseId)}
-            >
-              <div className="recent-update-main">
-                <div className="recent-update-title-row">
-                  <strong>{event.title}</strong>
-                  <span>{getEventSourceLabel(event.source)}</span>
-                </div>
-
-                <p>{event.text || "No additional details."}</p>
-
-                <div className="recent-update-meta">
-                  <span>{event.caseLabel}</span>
-                  <span>{event.formType}</span>
-                  <span>{event.receiptNumber}</span>
-                </div>
-              </div>
-
-              <div className="recent-update-date">{getShortDateTime(event.date)}</div>
-            </button>
-          ))}
-        </div>
-      )}
-    </section>
   );
 }
 
