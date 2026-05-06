@@ -5,7 +5,7 @@ const CASES_STORAGE_KEY = "case-status-tracker-cases-v2";
 const SETTINGS_STORAGE_KEY = "case-status-tracker-settings-worker-v1";
 const AUTH_SESSION_KEY = "case-status-tracker-auth-token-v1";
 const LAST_AUTO_CHECK_KEY = "case-status-tracker-last-auto-check-v1";
-const NOTIFICATIONS_LAST_SEEN_KEY = "case-status-tracker-notifications-last-seen-v1";
+const NOTIFICATIONS_READ_IDS_KEY = "case-status-tracker-notifications-read-ids-v1";
 const AUTO_CHECK_INTERVAL_MINUTES = 15;
 const AUTO_CHECK_INTERVAL_MS = AUTO_CHECK_INTERVAL_MINUTES * 60 * 1000;
 
@@ -270,6 +270,15 @@ function getNotificationSummary(event) {
   return "A tracked case status changed.";
 }
 
+function getNotificationId(event) {
+  return [
+    event?.caseId || "",
+    event?.date || "",
+    event?.title || "",
+    event?.source || "",
+  ].join("|");
+}
+
 
 function getStatusClass(status) {
   const lower = String(status || "").toLowerCase();
@@ -431,8 +440,8 @@ export default function App() {
     () => window.localStorage.getItem(LAST_AUTO_CHECK_KEY) || ""
   );
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
-  const [notificationsLastSeenAt, setNotificationsLastSeenAt] = useState(
-    () => window.localStorage.getItem(NOTIFICATIONS_LAST_SEEN_KEY) || ""
+  const [readNotificationIds, setReadNotificationIds] = useState(() =>
+    loadArrayFromStorage(NOTIFICATIONS_READ_IDS_KEY, [])
   );
   const notificationsMenuRef = useRef(null);
   const backupInputRef = useRef(null);
@@ -617,16 +626,14 @@ export default function App() {
       .slice(0, 20);
   }, [cases]);
 
-  const unreadNotificationsCount = useMemo(() => {
-    const lastSeenTimestamp = notificationsLastSeenAt
-      ? new Date(notificationsLastSeenAt).getTime()
-      : 0;
+  const readNotificationIdSet = useMemo(
+    () => new Set(readNotificationIds),
+    [readNotificationIds]
+  );
 
-    return notificationItems.filter((event) => {
-      const eventTimestamp = new Date(event.date).getTime();
-      return Number.isFinite(eventTimestamp) && eventTimestamp > lastSeenTimestamp;
-    }).length;
-  }, [notificationItems, notificationsLastSeenAt]);
+  const unreadNotificationsCount = useMemo(() => {
+    return notificationItems.filter((event) => !readNotificationIdSet.has(getNotificationId(event))).length;
+  }, [notificationItems, readNotificationIdSet]);
 
 
   function showToast(type, title, message = "") {
@@ -690,25 +697,32 @@ export default function App() {
     setActiveView("dashboard");
   }
 
+  function saveReadNotificationIds(nextIds) {
+    window.localStorage.setItem(NOTIFICATIONS_READ_IDS_KEY, JSON.stringify(nextIds));
+    setReadNotificationIds(nextIds);
+  }
+
+  function markNotificationAsRead(notification) {
+    const notificationId = getNotificationId(notification);
+
+    if (readNotificationIdSet.has(notificationId)) return;
+
+    saveReadNotificationIds([...readNotificationIds, notificationId]);
+  }
+
   function markNotificationsAsRead() {
-    const latestTimestamp = notificationItems[0]?.date || new Date().toISOString();
-    window.localStorage.setItem(NOTIFICATIONS_LAST_SEEN_KEY, latestTimestamp);
-    setNotificationsLastSeenAt(latestTimestamp);
+    const allNotificationIds = notificationItems.map(getNotificationId);
+    const mergedIds = Array.from(new Set([...readNotificationIds, ...allNotificationIds]));
+
+    saveReadNotificationIds(mergedIds);
   }
 
   function toggleNotificationsPanel() {
-    setIsNotificationsOpen((currentValue) => {
-      const nextValue = !currentValue;
-
-      if (nextValue) {
-        markNotificationsAsRead();
-      }
-
-      return nextValue;
-    });
+    setIsNotificationsOpen((currentValue) => !currentValue);
   }
 
   function handleNotificationClick(notification) {
+    markNotificationAsRead(notification);
     setSelectedCaseId(notification.caseId);
     setActiveView("dashboard");
     setIsNotificationsOpen(false);
@@ -1384,57 +1398,85 @@ export default function App() {
                 </button>
 
                 {isNotificationsOpen && (
-                  <div className="notification-popover">
-                    <div className="notification-popover-header">
-                      <div>
-                        <h3>Notifications</h3>
-                        <p>Case status changes from auto or manual checks.</p>
+                  <div className="notification-modal-overlay" role="dialog" aria-modal="true">
+                    <button
+                      type="button"
+                      className="notification-modal-backdrop"
+                      onClick={() => setIsNotificationsOpen(false)}
+                      aria-label="Close notifications"
+                    />
+
+                    <div className="notification-popover notification-modal-card">
+                      <div className="notification-popover-header">
+                        <div>
+                          <h3>Notifications</h3>
+                          <p>
+                            {unreadNotificationsCount} unread status change
+                            {unreadNotificationsCount === 1 ? "" : "s"}.
+                          </p>
+                        </div>
+
+                        <div className="notification-header-actions">
+                          <button
+                            type="button"
+                            className="notification-link-button"
+                            onClick={markNotificationsAsRead}
+                          >
+                            Mark all read
+                          </button>
+                          <button
+                            type="button"
+                            className="notification-close-button"
+                            onClick={() => setIsNotificationsOpen(false)}
+                            aria-label="Close notifications"
+                          >
+                            ×
+                          </button>
+                        </div>
                       </div>
 
-                      <button
-                        type="button"
-                        className="notification-link-button"
-                        onClick={markNotificationsAsRead}
-                      >
-                        Mark all read
-                      </button>
+                      {notificationItems.length === 0 ? (
+                        <div className="notification-empty-state">
+                          No case status change notifications yet.
+                        </div>
+                      ) : (
+                        <div className="notification-list">
+                          {notificationItems.map((notification, index) => {
+                            const notificationId = getNotificationId(notification);
+                            const isUnread = !readNotificationIdSet.has(notificationId);
+
+                            return (
+                              <button
+                                key={`${notificationId}-${index}`}
+                                type="button"
+                                className={`notification-item ${isUnread ? "unread" : "read"}`}
+                                onClick={() => handleNotificationClick(notification)}
+                              >
+                                <div className="notification-item-top">
+                                  <strong>{notification.caseLabel}</strong>
+                                  <span className="notification-item-date">
+                                    {getShortDateTime(notification.date)}
+                                  </span>
+                                </div>
+
+                                <div className="notification-item-badges">
+                                  {isUnread && <span className="notification-unread-chip">New</span>}
+                                  <span className="notification-item-source">
+                                    {getEventSourceLabel(notification.source)}
+                                  </span>
+                                  <span className="notification-item-meta">{notification.formType}</span>
+                                  <span className="notification-item-meta">
+                                    {displayReceipt(notification.receiptNumber, settings.maskReceiptNumbers)}
+                                  </span>
+                                </div>
+
+                                <p>{getNotificationSummary(notification)}</p>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
                     </div>
-
-                    {notificationItems.length === 0 ? (
-                      <div className="notification-empty-state">
-                        No case status change notifications yet.
-                      </div>
-                    ) : (
-                      <div className="notification-list">
-                        {notificationItems.map((notification, index) => (
-                            <button
-                              key={`${notification.caseId}-${notification.date}-${notification.title}-${index}`}
-                              type="button"
-                              className="notification-item"
-                              onClick={() => handleNotificationClick(notification)}
-                            >
-                              <div className="notification-item-top">
-                                <strong>{notification.caseLabel}</strong>
-                                <span className="notification-item-date">
-                                  {getShortDateTime(notification.date)}
-                                </span>
-                              </div>
-
-                              <div className="notification-item-badges">
-                                <span className="notification-item-source">
-                                  {getEventSourceLabel(notification.source)}
-                                </span>
-                                <span className="notification-item-meta">{notification.formType}</span>
-                                <span className="notification-item-meta">
-                                  {displayReceipt(notification.receiptNumber, settings.maskReceiptNumbers)}
-                                </span>
-                              </div>
-
-                              <p>{getNotificationSummary(notification)}</p>
-                            </button>
-                        ))}
-                      </div>
-                    )}
                   </div>
                 )}
               </div>
