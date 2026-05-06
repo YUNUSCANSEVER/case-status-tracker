@@ -2176,3 +2176,44 @@ tbody tr:hover,
     width: 100%;
   }
 }
+
+
+/* Notification position fix: open to the right of the Dashboard title, not under the sidebar */
+.topbar-title-row .notification-wrapper {
+  position: relative;
+}
+
+.topbar-title-row .notification-popover {
+  left: 0;
+  right: auto;
+  top: calc(100% + 12px);
+  width: min(520px, calc(100vw - 520px));
+  min-width: 430px;
+  z-index: 5000;
+}
+
+.sidebar {
+  position: relative;
+  z-index: 2;
+}
+
+.main-content {
+  position: relative;
+  z-index: 3;
+}
+
+@media (max-width: 1200px) {
+  .topbar-title-row .notification-popover {
+    width: min(460px, calc(100vw - 360px));
+    min-width: 360px;
+  }
+}
+
+@media (max-width: 760px) {
+  .topbar-title-row .notification-popover {
+    left: 0;
+    right: 0;
+    width: min(100%, calc(100vw - 32px));
+    min-width: 0;
+  }
+}

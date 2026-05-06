@@ -9,3 +9,5 @@ server/.env.local
 server/.env.development.local
 server/.env.production.local
 "@ | Add-Content .gitignore
+.vercel
+.env*.local
