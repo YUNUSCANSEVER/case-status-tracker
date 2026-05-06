@@ -1,0 +1,11 @@
+@"
+
+.env
+.env.local
+.env.development.local
+.env.production.local
+server/.env
+server/.env.local
+server/.env.development.local
+server/.env.production.local
+"@ | Add-Content .gitignore

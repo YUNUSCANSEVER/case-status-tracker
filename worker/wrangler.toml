@@ -1,0 +1,6 @@
+name = "case-status-tracker-api"
+main = "src/index.js"
+compatibility_date = "2026-05-06"
+
+[triggers]
+crons = ["*/15 * * * *"]
