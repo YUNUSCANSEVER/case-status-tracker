@@ -5,6 +5,7 @@ const CASES_STORAGE_KEY = "case-status-tracker-cases-v2";
 const SETTINGS_STORAGE_KEY = "case-status-tracker-settings-worker-v1";
 const AUTH_SESSION_KEY = "case-status-tracker-auth-token-v1";
 const LAST_AUTO_CHECK_KEY = "case-status-tracker-last-auto-check-v1";
+const NOTIFICATIONS_LAST_SEEN_KEY = "case-status-tracker-notifications-last-seen-v1";
 const AUTO_CHECK_INTERVAL_MINUTES = 15;
 const AUTO_CHECK_INTERVAL_MS = AUTO_CHECK_INTERVAL_MINUTES * 60 * 1000;
 
@@ -251,6 +252,25 @@ function getEventSourceLabel(source) {
   return sourceMap[source] || source || "Tracker";
 }
 
+function isStatusChangeNotificationEvent(event) {
+  const title = String(event?.title || "").toLowerCase();
+  const text = String(event?.text || "").toLowerCase();
+
+  return (
+    title === "status updated" ||
+    title === "case status updated manually" ||
+    text.includes("status changed to") ||
+    text.includes("status manually updated to")
+  );
+}
+
+function getNotificationSummary(event) {
+  if (event?.text) return event.text;
+  if (event?.title) return event.title;
+  return "A tracked case status changed.";
+}
+
+
 function getStatusClass(status) {
   const lower = String(status || "").toLowerCase();
 
@@ -410,6 +430,11 @@ export default function App() {
   const [lastAutoCheckAt, setLastAutoCheckAt] = useState(
     () => window.localStorage.getItem(LAST_AUTO_CHECK_KEY) || ""
   );
+  const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
+  const [notificationsLastSeenAt, setNotificationsLastSeenAt] = useState(
+    () => window.localStorage.getItem(NOTIFICATIONS_LAST_SEEN_KEY) || ""
+  );
+  const notificationsMenuRef = useRef(null);
   const backupInputRef = useRef(null);
 
   useEffect(() => {
@@ -574,6 +599,36 @@ export default function App() {
       .slice(0, 8);
   }, [cases]);
 
+  const notificationItems = useMemo(() => {
+    return cases
+      .flatMap((caseItem) =>
+        (caseItem.history || [])
+          .filter((event) => isStatusChangeNotificationEvent(event))
+          .map((event) => ({
+            ...event,
+            caseId: caseItem.id,
+            caseLabel: caseItem.caseLabel,
+            receiptNumber: caseItem.receiptNumber,
+            formType: caseItem.formType,
+            currentStatus: caseItem.status,
+          }))
+      )
+      .sort((a, b) => new Date(b.date) - new Date(a.date))
+      .slice(0, 20);
+  }, [cases]);
+
+  const unreadNotificationsCount = useMemo(() => {
+    const lastSeenTimestamp = notificationsLastSeenAt
+      ? new Date(notificationsLastSeenAt).getTime()
+      : 0;
+
+    return notificationItems.filter((event) => {
+      const eventTimestamp = new Date(event.date).getTime();
+      return Number.isFinite(eventTimestamp) && eventTimestamp > lastSeenTimestamp;
+    }).length;
+  }, [notificationItems, notificationsLastSeenAt]);
+
+
   function showToast(type, title, message = "") {
     const id = Date.now();
 
@@ -634,6 +689,31 @@ export default function App() {
     setIsAuthenticated(false);
     setActiveView("dashboard");
   }
+
+  function markNotificationsAsRead() {
+    const latestTimestamp = notificationItems[0]?.date || new Date().toISOString();
+    window.localStorage.setItem(NOTIFICATIONS_LAST_SEEN_KEY, latestTimestamp);
+    setNotificationsLastSeenAt(latestTimestamp);
+  }
+
+  function toggleNotificationsPanel() {
+    setIsNotificationsOpen((currentValue) => {
+      const nextValue = !currentValue;
+
+      if (nextValue) {
+        markNotificationsAsRead();
+      }
+
+      return nextValue;
+    });
+  }
+
+  function handleNotificationClick(notification) {
+    setSelectedCaseId(notification.caseId);
+    setActiveView("dashboard");
+    setIsNotificationsOpen(false);
+  }
+
 
   function getBackendBaseUrl() {
     return settings.backendApiUrl.replace(/\/$/, "");
@@ -1180,6 +1260,31 @@ export default function App() {
   const pageTitle = views.find((item) => item.key === activeView)?.label || "Dashboard";
   const themeClass = settings.themeMode === "night" ? "theme-night" : "theme-day";
 
+
+  useEffect(() => {
+    if (!isNotificationsOpen) return undefined;
+
+    function handlePointerDown(event) {
+      if (!notificationsMenuRef.current?.contains(event.target)) {
+        setIsNotificationsOpen(false);
+      }
+    }
+
+    function handleEscape(event) {
+      if (event.key === "Escape") {
+        setIsNotificationsOpen(false);
+      }
+    }
+
+    document.addEventListener("mousedown", handlePointerDown);
+    document.addEventListener("keydown", handleEscape);
+
+    return () => {
+      document.removeEventListener("mousedown", handlePointerDown);
+      document.removeEventListener("keydown", handleEscape);
+    };
+  }, [isNotificationsOpen]);
+
   if (!isAuthenticated) {
     return (
       <LoginScreen
@@ -1263,6 +1368,78 @@ export default function App() {
           </div>
 
           <div className="topbar-actions">
+            <div className="notification-wrapper" ref={notificationsMenuRef}>
+              <button
+                type="button"
+                className={`notification-button ${isNotificationsOpen ? "open" : ""}`}
+                onClick={toggleNotificationsPanel}
+                aria-label="Open notifications"
+                aria-expanded={isNotificationsOpen}
+              >
+                <span className="notification-button-icon">🔔</span>
+                {unreadNotificationsCount > 0 && (
+                  <span className="notification-badge">
+                    {unreadNotificationsCount > 9 ? "9+" : unreadNotificationsCount}
+                  </span>
+                )}
+              </button>
+
+              {isNotificationsOpen && (
+                <div className="notification-popover">
+                  <div className="notification-popover-header">
+                    <div>
+                      <h3>Notifications</h3>
+                      <p>Case status changes from auto or manual checks.</p>
+                    </div>
+
+                    <button
+                      type="button"
+                      className="notification-link-button"
+                      onClick={markNotificationsAsRead}
+                    >
+                      Mark all read
+                    </button>
+                  </div>
+
+                  {notificationItems.length === 0 ? (
+                    <div className="notification-empty-state">
+                      No case status change notifications yet.
+                    </div>
+                  ) : (
+                    <div className="notification-list">
+                      {notificationItems.map((notification, index) => (
+                        <button
+                          key={`${notification.caseId}-${notification.date}-${notification.title}-${index}`}
+                          type="button"
+                          className="notification-item"
+                          onClick={() => handleNotificationClick(notification)}
+                        >
+                          <div className="notification-item-top">
+                            <strong>{notification.caseLabel}</strong>
+                            <span className="notification-item-date">
+                              {getShortDateTime(notification.date)}
+                            </span>
+                          </div>
+
+                          <div className="notification-item-badges">
+                            <span className="notification-item-source">
+                              {getEventSourceLabel(notification.source)}
+                            </span>
+                            <span className="notification-item-meta">{notification.formType}</span>
+                            <span className="notification-item-meta">
+                              {displayReceipt(notification.receiptNumber, settings.maskReceiptNumbers)}
+                            </span>
+                          </div>
+
+                          <p>{getNotificationSummary(notification)}</p>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
             <input
               value={search}
               onChange={(event) => setSearch(event.target.value)}
